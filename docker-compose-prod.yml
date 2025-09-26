@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: tt-generator-db
+    hostname: tt-generator-db
+    environment:
+      POSTGRES_DB: fk_timetable
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    networks:
+      - mynet
+
+
+  pgadmin:
+    image: elestio/pgadmin:latest
+    restart: always
+    container_name: pgadmin
+    hostname: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: reezaverse@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: reezaverse
+      PGADMIN_LISTEN_ADDRESS: 0.0.0.0
+      PGADMIN_LISTEN_PORT: 8080
+    depends_on:
+      - postgres
+    ports:
+      - "5080:8080"         # Maps pgAdmin to VPS port (optional)
+    networks:
+      - mynet
+
+
+  backend:
+    image: hasrulreeza/tt-gen-be:main
+    container_name: tt-generator-be
+    hostname: tt-generator-be
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tt-generator-db:5432/fk_timetable
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: pass
+      APP_URL: https://tt-demo-be.reezaverse.com
+      CLIENT_ORIGIN_URL: https://tt-demo.reezaverse.com
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    networks:
+      - mynet
+
+
+  frontend:
+    image: hasrulreeza/tt-gen-fe:main
+    container_name: tt-generator-fe
+    hostname: tt-generator-fe
+    environment:
+      VITE_API_BASE: https://tt-demo-be.reezaverse.com
+    stdin_open: true
+    tty: true
+    depends_on:
+      - backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - mynet
+
+
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "81:81"     # NPM Admin UI
+      - "443:443"
+    environment:
+      - TZ=UTC
+      - DISABLE_IPV6=true
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+    networks:
+      - mynet
+
+volumes:
+  pg_data:
+  npm_data:
+  npm_letsencrypt:
+
+networks:
+  mynet:
+    external: true
